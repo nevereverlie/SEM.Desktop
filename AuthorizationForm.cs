@@ -63,7 +63,10 @@ namespace SEM.Desktop
 
             Thread.Sleep(1000);
 
-            this.Close();
+            this.Hide();
+            var mainForm = new MainForm(user);
+            mainForm.Closed += (_, _) => this.Close();
+            mainForm.Show();
         }
 
         private static async Task<HttpResponseMessage> LoginUser(LoginUser userToLogin, HttpClient client)

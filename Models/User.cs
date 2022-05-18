@@ -1,6 +1,6 @@
 namespace SEM.Desktop.Models
 {
-    internal class User
+    public class User
     {
         public int UserId { get; set; }
         public string UserEmail { get; set; }
@@ -10,5 +10,6 @@ namespace SEM.Desktop.Models
         public int WastedHours { get; set; }
         public int WorkedMinutes { get; set; }
         public int WastedMinutes { get; set; }
+        public string[] AllowedApps { get; set; }
     }
 }

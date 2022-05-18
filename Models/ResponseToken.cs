@@ -1,6 +1,6 @@
 namespace SEM.Desktop.Models
 {
-    internal class ResponseToken
+    public class ResponseToken
     {
         public int UserId { get; set; }
         public string Email { get; set; }
