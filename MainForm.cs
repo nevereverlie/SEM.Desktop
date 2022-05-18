@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Drawing.Imaging;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -7,8 +8,9 @@ using AForge.Video.DirectShow;
 using Emgu.CV;
 using Emgu.CV.Structure;
 using SEM.Desktop.Models;
-using Timer = System.Threading.Timer;
-
+using SEM.Desktop.Extensions;
+using static System.Threading.Timer;
+using System.Net.Http.Headers;
 
 namespace SEM.Desktop
 {
@@ -21,6 +23,10 @@ namespace SEM.Desktop
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
 
         public static User User { get; set; }
+
+        private Image currentCamSnapshot;
+
+        private System.Threading.Timer timer;
         public MainForm(User user)
         {
             InitializeComponent();
@@ -56,7 +62,8 @@ namespace SEM.Desktop
             _device.NewFrame += Device_NewFrame;
             _device.Start();
 
-            _ = new Timer(IsUserWorking, null, 0, Constants.FIVE_SECONDS);
+            timer = new System.Threading.Timer(IsUserWorking, null, Constants.FIVE_SECONDS, Constants.TEN_SECONDS);
+            runBtn.Enabled = false;
         }
 
         private static readonly CascadeClassifier CascadeClassifier = new ("haarcascade_frontalface_alt_tree.xml");
@@ -64,9 +71,10 @@ namespace SEM.Desktop
         private void Device_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
             var bitmap = (Bitmap)eventArgs.Frame.Clone();
+            currentCamSnapshot = (Image)bitmap.Clone();
             var grayImage = bitmap.ToImage<Bgr, byte>();
 
-            var rectangles = CascadeClassifier.DetectMultiScale(grayImage, 1.2, 1);
+            var rectangles = CascadeClassifier.DetectMultiScale(grayImage, 1.1, 1);
             foreach (var rectangle in rectangles)
             {
                 using var graphics = Graphics.FromImage(bitmap);
@@ -81,21 +89,51 @@ namespace SEM.Desktop
             using var client = new HttpClient();
             try
             {
-                var addMinuteResult = await client.PutAsync(Constants.API_URL + $"users/{User.UserId}/working/{IsAllowedApp()}", null);
-                addMinuteResult.EnsureSuccessStatusCode();
-                logsTb.AppendText($"\nUser {User.Lastname} {User.Firstname} worked in {GetActiveWindowTitle()} for 1 minute." );
+                bool isUserWorking = IsAllowedApp();
+                if (!isUserWorking)
+                {
+                    await client.PutAsync(Constants.API_URL + $"users/{User.UserId}/working/{false}", null);
+                    logsTb.Invoke(new Action(() =>
+                        logsTb.AppendText(Environment.NewLine + $"\nUser {User.Lastname} {User.Firstname} wasted 1 minute in {GetActiveWindowTitle()}.")));
+                    
+                    return;
+                }
+
+                var byteArray = ImageToByteArray(currentCamSnapshot);
+
+                var formContent = new MultipartFormDataContent
+                {
+                    { new ByteArrayContent(byteArray), "file", "file.jpg" }
+                };
+
+                HttpResponseMessage response = await client.PostAsync(Constants.API_URL + $"users/{User.UserId}/face", formContent);
+                response.EnsureSuccessStatusCode();
+
+                bool isFaceDetected = response.Content.ReadAsAsync<bool>().Result;
+                if (isFaceDetected)
+                {
+                    var addMinuteResult = await client.PutAsync(Constants.API_URL + $"users/{User.UserId}/working/{true}", null);
+                    addMinuteResult.EnsureSuccessStatusCode();
+
+                    logsTb.Invoke(new Action(() =>
+                        logsTb.AppendText(Environment.NewLine + $"\nUser {User.Lastname} {User.Firstname} worked in {GetActiveWindowTitle()} for 1 minute.")));
+                    
+                    return;
+                }
+
+                logsTb.Invoke(new Action(() =>
+                    logsTb.AppendText(Environment.NewLine + $"\nUser {User.Lastname} {User.Firstname} has NOT been present for 1 minute.")));
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                await client.PutAsync(Constants.API_URL + $"users/{User.UserId}/working/{false}", null);
-                logsTb.AppendText($"\nUser {User.Lastname} {User.Firstname} wasted 1 minute in {GetActiveWindowTitle()}.");
+                MessageBox.Show(ex.Message, "Exception happened", MessageBoxButtons.OK);
             }
         }
 
         private static bool IsAllowedApp()
         {
             string activeWindowTitle = GetActiveWindowTitle();
-            return (User.AllowedApps.Contains(activeWindowTitle) && GetActiveWindowTitle() != string.Empty);
+            return (User.AllowedApps.Any(activeWindowTitle.Contains) && GetActiveWindowTitle() != string.Empty);
         }
 
         private static string GetActiveWindowTitle()
@@ -107,10 +145,22 @@ namespace SEM.Desktop
             return (GetWindowText(handle, buff, nChars) > 0 ? buff.ToString() : null) ?? string.Empty;
         }
 
+        private byte[] ImageToByteArray(System.Drawing.Image imageIn)
+        {
+            using (var ms = new MemoryStream())
+            {
+                imageIn.Save(ms, ImageFormat.Png);
+                return ms.ToArray();
+            }
+        }
+
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             if (_device.IsRunning)
-                _device.Stop();
+            {
+                _device.SignalToStop();
+                _device.WaitForStop();
+            }
         }
     }
 }

@@ -57,12 +57,6 @@ namespace SEM.Desktop
 
             user = userResult.Content.ReadAsAsync<User>().Result;
 
-            errorLb.Visible = true;
-            errorLb.ForeColor = Color.Green;
-            errorLb.Text = @"Success!";
-
-            Thread.Sleep(1000);
-
             this.Hide();
             var mainForm = new MainForm(user);
             mainForm.Closed += (_, _) => this.Close();
