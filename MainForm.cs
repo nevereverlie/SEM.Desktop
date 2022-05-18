@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using AForge.Video;
 using AForge.Video.DirectShow;
 using Emgu.CV;
@@ -31,7 +32,7 @@ namespace SEM.Desktop
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-            Array.ForEach(User.AllowedApps, app => allowedAppsTb.AppendText(app));
+            Array.ForEach(User.AllowedApps, app => allowedAppsTb.AppendText(Environment.NewLine + Regex.Unescape($"\\u2713 {app}")));
 
             _filter = new FilterInfoCollection(FilterCategory.VideoInputDevice);
             foreach (FilterInfo device in _filter)
@@ -39,12 +40,18 @@ namespace SEM.Desktop
                 deviceCb.Items.Add(device.Name);
             }
 
-            deviceCb.SelectedIndex = 0;
+            deviceCb.SelectedIndex = -1;
             _device = new VideoCaptureDevice();
         }
 
         private void runBtn_Click(object sender, EventArgs e)
         {
+            if (deviceCb.SelectedIndex == -1)
+            {
+                MessageBox.Show(@"No camera selected!", @"Error", MessageBoxButtons.OK);
+                return;
+            }
+
             _device = new VideoCaptureDevice(_filter[deviceCb.SelectedIndex].MonikerString);
             _device.NewFrame += Device_NewFrame;
             _device.Start();
