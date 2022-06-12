@@ -42,6 +42,8 @@ namespace SEM.Desktop
             {
                 isLoggedIn = true;
                 token = loginResult.Content.ReadAsAsync<ResponseToken>().Result;
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token.Token);
             }
             else
             {
@@ -58,7 +60,7 @@ namespace SEM.Desktop
             user = userResult.Content.ReadAsAsync<User>().Result;
 
             this.Hide();
-            var mainForm = new MainForm(user);
+            var mainForm = new MainForm(user, token);
             mainForm.Closed += (_, _) => this.Close();
             mainForm.Show();
         }

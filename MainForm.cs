@@ -23,14 +23,16 @@ namespace SEM.Desktop
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
 
         public static User User { get; set; }
+        public static ResponseToken Token { get; set; }
 
         private Image currentCamSnapshot;
 
         private System.Threading.Timer timer;
-        public MainForm(User user)
+        public MainForm(User user, ResponseToken token)
         {
             InitializeComponent();
             User = user;
+            Token = token;
         }
 
         private FilterInfoCollection _filter;
@@ -87,6 +89,8 @@ namespace SEM.Desktop
         private async void IsUserWorking(Object state)
         {
             using var client = new HttpClient();
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", Token.Token);
             try
             {
                 bool isUserWorking = IsAllowedApp();
