@@ -40,7 +40,8 @@ namespace SEM.Desktop
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-            Array.ForEach(User.AllowedApps, app => allowedAppsTb.AppendText(Environment.NewLine + Regex.Unescape($"\\u2713 {app}")));
+            Array.ForEach(User.AllowedApps, app =>
+                allowedAppsTb.AppendText(Environment.NewLine + Regex.Unescape($"\\u2713 {app}")));
 
             _filter = new FilterInfoCollection(FilterCategory.VideoInputDevice);
             foreach (FilterInfo device in _filter)
@@ -64,7 +65,7 @@ namespace SEM.Desktop
             _device.NewFrame += Device_NewFrame;
             _device.Start();
 
-            timer = new System.Threading.Timer(IsUserWorking, null, Constants.FIVE_SECONDS, Constants.TEN_SECONDS);
+            timer = new System.Threading.Timer(IsUserWorking!, null, Constants.FIVE_SECONDS, Constants.MINUTE);
             runBtn.Enabled = false;
         }
 
@@ -99,7 +100,6 @@ namespace SEM.Desktop
                     await client.PutAsync(Constants.API_URL + $"users/{User.UserId}/working/{false}", null);
                     logsTb.Invoke(new Action(() =>
                         logsTb.AppendText(Environment.NewLine + $"\nUser {User.Lastname} {User.Firstname} wasted 1 minute in {GetActiveWindowTitle()}.")));
-                    
                     return;
                 }
 
@@ -149,13 +149,11 @@ namespace SEM.Desktop
             return (GetWindowText(handle, buff, nChars) > 0 ? buff.ToString() : null) ?? string.Empty;
         }
 
-        private byte[] ImageToByteArray(System.Drawing.Image imageIn)
+        private byte[] ImageToByteArray(Image imageIn)
         {
-            using (var ms = new MemoryStream())
-            {
-                imageIn.Save(ms, ImageFormat.Png);
-                return ms.ToArray();
-            }
+            using var ms = new MemoryStream();
+            imageIn.Save(ms, ImageFormat.Png);
+            return ms.ToArray();
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)

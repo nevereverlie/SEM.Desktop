@@ -26,7 +26,7 @@ namespace SEM.Desktop
             InitializeComponent();
         }
 
-        private async void button1_Click(object sender, EventArgs e)
+        private async void loginBtn_Click(object sender, EventArgs e)
         {
             bool isLoggedIn = false;
             using var client = new HttpClient();
